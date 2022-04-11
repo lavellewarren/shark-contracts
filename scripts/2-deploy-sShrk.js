@@ -15,7 +15,7 @@ async function main() {
     address: contract.address,
     abi: JSON.parse(contract.interface.format('json'))
   };
-  fs.writeFileSync('abi/sShrk.json', JSON.stringify(data));
+  fs.writeFileSync('abi/sShrkToken.json', JSON.stringify(data));
 }
 
 main()
