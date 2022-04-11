@@ -7,7 +7,7 @@ async function main() {
   const balance = await deployer.getBalance();
   console.log(`Account balance: ${balance.toString()}`);
 
-  const contractFactory = await ethers.getContractFactory('ShrkERC20');
+  const contractFactory = await ethers.getContractFactory('ShrkERC20Token');
   const contract = await contractFactory.deploy();
   console.log(`Contract address: ${contract.address}`);
 

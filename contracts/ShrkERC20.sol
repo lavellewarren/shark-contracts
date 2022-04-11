@@ -820,11 +820,11 @@ contract VaultOwned is Ownable {
 }
 
 
-contract ShrkERC20 is ERC20Permit, VaultOwned {
+contract ShrkERC20Token is ERC20Permit, VaultOwned {
 
     using SafeMath for uint256;
 
-    constructor() ERC20("Shark", "SHRK", 9) {
+    constructor() ERC20("SharkTank", "SHRK", 9) {
     }
 
     function mint(address account_, uint256 amount_) external onlyVault() {
