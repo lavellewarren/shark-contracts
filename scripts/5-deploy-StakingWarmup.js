@@ -24,6 +24,9 @@ async function main() {
         abi: JSON.parse(contract.interface.format('json'))
     };
     fs.writeFileSync('abi/StakingWarmup.json', JSON.stringify(data));
+
+    console.log("Verify contract:");
+    console.log(`npx hardhat verify --network rinkeby ${contract.address} ${staking.address} ${sSHRK.address}`);
 }
 
 main()

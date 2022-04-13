@@ -20,13 +20,14 @@ async function main() {
     const timenow = block.timestamp;
 
     const _epochLength = 8 * 60 * 60;	// 8 hours
+    const number = 0;
 
     const contractFactory = await ethers.getContractFactory('SharkStaking');
     const contract = await contractFactory.deploy(
         SHRK.address,
         sSHRK.address,
         _epochLength,
-        0,
+        number,
         timenow
     );
     console.log(`Contract address: ${contract.address}`);
@@ -36,6 +37,9 @@ async function main() {
         abi: JSON.parse(contract.interface.format('json'))
     };
     fs.writeFileSync('abi/SharkStaking.json', JSON.stringify(data));
+
+    console.log("Verify contract:");
+    console.log(`npx hardhat verify --network rinkeby ${contract.address} ${SHRK.address} ${sSHRK.address} ${_epochLength} ${number} ${timenow}`);
 }
 
 main()
