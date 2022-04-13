@@ -40,6 +40,9 @@ async function main() {
         abi: JSON.parse(contract.interface.format('json'))
     };
     fs.writeFileSync('abi/SharkBondDepository.json', JSON.stringify(data));
+
+    console.log("Verify contract:");
+    console.log(`npx hardhat verify --network rinkeby ${contract.address} ${SHRK.address} ${_principle} ${treasury.address} ${DAO.address} ${bondCalculator.address}`);
 }
 
 main()
