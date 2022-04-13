@@ -1,6 +1,6 @@
 const fs = require('fs');
-const ShrkERC20 = require('../abi/ShrkERC20.json');
-const Treasury = require('../abi/Treasury.json');
+const ShrkERC20 = require('../abi/SharkERC20Token.json');
+const SharkTreasury = require('../abi/SharkTreasury.json');
 
 async function main() {
   const [deployer] = await ethers.getSigners();
@@ -12,14 +12,14 @@ async function main() {
   const SHRK = new ethers.Contract(ShrkERC20.address, ShrkERC20.abi, deployer);
   console.log(`SHRK address: ${SHRK.address}`);
 
-  const ShrkTreasury = new ethers.Contract(Treasury.address, Treasury.abi, deployer);
-  console.log(`Treasury address: ${ShrkTreasury.address}`);
+  const treasury = new ethers.Contract(SharkTreasury.address, SharkTreasury.abi, deployer);
+  console.log(`SharkTreasury address: ${treasury.address}`);
 
   const _epochLength = 10;
   const _nextEpochTime = 10;
 
   const contractFactory = await ethers.getContractFactory('Distributor');
-  const contract = await contractFactory.deploy(SHRK.address, ShrkTreasury.address, _epochLength, _nextEpochTime);
+  const contract = await contractFactory.deploy(SHRK.address, treasury.address, _epochLength, _nextEpochTime);
   console.log(`Contract address: ${contract.address}`);
 
   const data = {

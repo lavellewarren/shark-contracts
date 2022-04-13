@@ -7,7 +7,7 @@ async function main() {
   const balance = await deployer.getBalance();
   console.log(`Account balance: ${balance.toString()}`);
 
-  const contractFactory = await ethers.getContractFactory('StakedShrk');
+  const contractFactory = await ethers.getContractFactory('StakedShark');
   const contract = await contractFactory.deploy();
   console.log(`Contract address: ${contract.address}`);
 
@@ -15,7 +15,7 @@ async function main() {
     address: contract.address,
     abi: JSON.parse(contract.interface.format('json'))
   };
-  fs.writeFileSync('abi/sShrkToken.json', JSON.stringify(data));
+  fs.writeFileSync('abi/StakedShark.json', JSON.stringify(data));
 }
 
 main()

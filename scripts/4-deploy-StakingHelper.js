@@ -1,6 +1,6 @@
 const fs = require('fs');
-const ShrkERC20 = require('../abi/ShrkERC20.json');
-const Staking = require('../abi/Staking.json');
+const ShrkERC20 = require('../abi/SharkERC20Token.json');
+const SharkStaking = require('../abi/SharkStaking.json');
 
 async function main() {
   const [deployer] = await ethers.getSigners();
@@ -12,8 +12,8 @@ async function main() {
   const SHRK = new ethers.Contract(ShrkERC20.address, ShrkERC20.abi, deployer);
   console.log(`SHRK address: ${SHRK.address}`);
 
-  const staking = new ethers.Contract(Staking.address, Staking.abi, deployer);
-  console.log(`Staking address: ${staking.address}`);
+  const staking = new ethers.Contract(SharkStaking.address, SharkStaking.abi, deployer);
+  console.log(`SharkStaking address: ${staking.address}`);
 
   const contractFactory = await ethers.getContractFactory('StakingHelper');
   const contract = await contractFactory.deploy(SHRK.address, staking.address);
