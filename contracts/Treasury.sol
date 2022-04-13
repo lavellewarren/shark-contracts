@@ -289,7 +289,7 @@ interface IBondCalculator {
         returns (uint256 _value);
 }
 
-contract ShrkTreasury is Ownable {
+contract SharkTreasury is Ownable {
     using SafeMath for uint256;
     using SafeMath for uint32;
     using SafeERC20 for IERC20;

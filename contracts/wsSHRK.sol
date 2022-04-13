@@ -937,7 +937,7 @@ contract wsSHRK is ERC20 {
 
     address public immutable sSHRK;
 
-    constructor(address _sSHRK) ERC20("Wrapped sSHRK", "wsSHRK") {
+    constructor(address _sSHRK) ERC20("Wrapped Staked Shark", "wsSHRK") {
         require(_sSHRK != address(0));
         sSHRK = _sSHRK;
     }

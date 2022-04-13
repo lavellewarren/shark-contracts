@@ -709,7 +709,7 @@ interface IDistributor {
     function distribute() external returns (bool);
 }
 
-contract ShrkStaking is Ownable {
+contract SharkStaking is Ownable {
     using SafeMath for uint256;
     using SafeMath for uint32;
     using SafeERC20 for IERC20;

@@ -298,7 +298,7 @@ interface IBondingCalculator {
         returns (uint256 _value);
 }
 
-contract ShrkBondingCalculator is IBondingCalculator {
+contract SharkBondingCalculator is IBondingCalculator {
     using FixedPoint for *;
     using SafeMath for uint256;
     using SafeMath for uint112;

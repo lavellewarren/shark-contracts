@@ -858,7 +858,7 @@ interface IShrkBondDepository {
     ) external returns (uint256);
 }
 
-contract Wonderland_ZapIn_V1 is ZapInBaseV3_1 {
+contract Shark_ZapIn_V1 is ZapInBaseV3_1 {
     using SafeERC20 for IERC20;
 
     mapping(IShrkBondDepository => address) public allowedPairs;

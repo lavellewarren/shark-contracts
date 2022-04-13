@@ -1129,7 +1129,7 @@ contract VaultOwned is Ownable {
     }
 }
 
-contract ShrkERC20Token is ERC20Permit, VaultOwned {
+contract SharkERC20Token is ERC20Permit, VaultOwned {
     using SafeMath for uint256;
 
     constructor() ERC20("Shark", "SHRK", 9) {}
