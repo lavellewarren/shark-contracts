@@ -861,6 +861,39 @@ library FixedPoint {
     }
 }
 
+interface AggregatorV3Interface {
+    function decimals() external view returns (uint8);
+
+    function description() external view returns (string memory);
+
+    function version() external view returns (uint256);
+
+    // getRoundData and latestRoundData should both raise "No data present"
+    // if they do not have data to report, instead of returning unset values
+    // which could be misinterpreted as actual reported values.
+    function getRoundData(uint80 _roundId)
+        external
+        view
+        returns (
+            uint80 roundId,
+            int256 answer,
+            uint256 startedAt,
+            uint256 updatedAt,
+            uint80 answeredInRound
+        );
+
+    function latestRoundData()
+        external
+        view
+        returns (
+            uint80 roundId,
+            int256 answer,
+            uint256 startedAt,
+            uint256 updatedAt,
+            uint80 answeredInRound
+        );
+}
+
 interface ITreasury {
     function deposit(
         uint256 _amount,
@@ -872,15 +905,8 @@ interface ITreasury {
         external
         view
         returns (uint256 value_);
-}
 
-interface IBondCalculator {
-    function valuation(address _LP, uint256 _amount)
-        external
-        view
-        returns (uint256);
-
-    function markdown(address _LP) external view returns (uint256);
+    function mintRewards(address _recipient, uint256 _amount) external;
 }
 
 interface IStaking {
@@ -889,6 +915,11 @@ interface IStaking {
 
 interface IStakingHelper {
     function stake(uint256 _amount, address _recipient) external;
+}
+
+interface IWETH9 is IERC20 {
+    /// @notice Deposit ether to get wrapped ether
+    function deposit() external payable;
 }
 
 contract ShrkBondDepository is Ownable {
@@ -923,14 +954,12 @@ contract ShrkBondDepository is Ownable {
     );
 
     /* ======== STATE VARIABLES ======== */
-
-    address public immutable Shrk; // token given as payment for bond
+    address public immutable SHRK; // token given as payment for bond
     address public immutable principle; // token used to create bond
     address public immutable treasury; // mints SHRK when receives principle
     address public immutable DAO; // receives profit share from bond
 
-    bool public immutable isLiquidityBond; // LP and Reserve bonds are treated slightly different
-    address public immutable bondCalculator; // calculates value of LP tokens
+    AggregatorV3Interface internal priceFeed;
 
     address public staking; // to auto-stake payout
     address public stakingHelper; // to stake and claim if no staking warmup
@@ -942,16 +971,15 @@ contract ShrkBondDepository is Ownable {
     mapping(address => Bond) public bondInfo; // stores bond information for depositors
 
     uint256 public totalDebt; // total value of outstanding bonds; used for pricing
-    uint32 public lastDecay; // reference time for debt decay
+    uint32 public lastDecay; // reference block for debt decay
 
     /* ======== STRUCTS ======== */
 
     // Info for creating new bonds
     struct Terms {
         uint256 controlVariable; // scaling variable for price
-        uint256 minimumPrice; // vs principle value
+        uint256 minimumPrice; // vs principle value. 4 decimals (1500 = 0.15)
         uint256 maxPayout; // in thousandths of a %. i.e. 500 = 0.5%
-        uint256 fee; // as % of bond payout, in hundreths. ( 500 = 5% = 0.05 for every 1 paid)
         uint256 maxDebt; // 9 decimal debt ratio, max % total supply created as debt
         uint32 vestingTerm; // in seconds
     }
@@ -960,8 +988,8 @@ contract ShrkBondDepository is Ownable {
     struct Bond {
         uint256 payout; // SHRK remaining to be paid
         uint256 pricePaid; // In DAI, for front end viewing
-        uint32 lastTime; // Last interaction
         uint32 vesting; // Seconds left to vest
+        uint32 lastTime; // Last interaction
     }
 
     // Info for incremental adjustments to control variable
@@ -970,38 +998,36 @@ contract ShrkBondDepository is Ownable {
         uint256 rate; // increment
         uint256 target; // BCV when adjustment finished
         uint32 buffer; // minimum length (in seconds) between adjustments
-        uint32 lastTime; // time when last adjustment made
+        uint32 lastTime; // block when last adjustment made
     }
 
     /* ======== INITIALIZATION ======== */
 
     constructor(
-        address _Shrk,
+        address _SHRK,
         address _principle,
         address _treasury,
         address _DAO,
-        address _bondCalculator
+        address _feed
     ) {
-        require(_Shrk != address(0));
-        Shrk = _Shrk;
+        require(_SHRK != address(0));
+        SHRK = _SHRK;
         require(_principle != address(0));
         principle = _principle;
         require(_treasury != address(0));
         treasury = _treasury;
         require(_DAO != address(0));
         DAO = _DAO;
-        // bondCalculator should be address(0) if not LP bond
-        bondCalculator = _bondCalculator;
-        isLiquidityBond = (_bondCalculator != address(0));
+        require(_feed != address(0));
+        priceFeed = AggregatorV3Interface(_feed);
     }
 
     /**
      *  @notice initializes bond parameters
      *  @param _controlVariable uint
-     *  @param _vestingTerm uint32
+     *  @param _vestingTerm uint
      *  @param _minimumPrice uint
      *  @param _maxPayout uint
-     *  @param _fee uint
      *  @param _maxDebt uint
      *  @param _initialDebt uint
      */
@@ -1009,19 +1035,17 @@ contract ShrkBondDepository is Ownable {
         uint256 _controlVariable,
         uint256 _minimumPrice,
         uint256 _maxPayout,
-        uint256 _fee,
         uint256 _maxDebt,
         uint256 _initialDebt,
         uint32 _vestingTerm
     ) external onlyPolicy {
-        require(terms.controlVariable == 0, "Bonds must be initialized from 0");
+        require(currentDebt() == 0, "Debt must be 0 for initialization");
         terms = Terms({
             controlVariable: _controlVariable,
+            vestingTerm: _vestingTerm,
             minimumPrice: _minimumPrice,
             maxPayout: _maxPayout,
-            fee: _fee,
-            maxDebt: _maxDebt,
-            vestingTerm: _vestingTerm
+            maxDebt: _maxDebt
         });
         totalDebt = _initialDebt;
         lastDecay = uint32(block.timestamp);
@@ -1032,7 +1056,6 @@ contract ShrkBondDepository is Ownable {
     enum PARAMETER {
         VESTING,
         PAYOUT,
-        FEE,
         DEBT,
         MINPRICE
     }
@@ -1054,15 +1077,11 @@ contract ShrkBondDepository is Ownable {
             // 1
             require(_input <= 1000, "Payout cannot be above 1 percent");
             terms.maxPayout = _input;
-        } else if (_parameter == PARAMETER.FEE) {
-            // 2
-            require(_input <= 10000, "DAO fee cannot exceed payout");
-            terms.fee = _input;
         } else if (_parameter == PARAMETER.DEBT) {
-            // 3
+            // 2
             terms.maxDebt = _input;
         } else if (_parameter == PARAMETER.MINPRICE) {
-            // 4
+            // 3
             terms.minimumPrice = _input;
         }
     }
@@ -1123,7 +1142,7 @@ contract ShrkBondDepository is Ownable {
         uint256 _amount,
         uint256 _maxPrice,
         address _depositor
-    ) external returns (uint256) {
+    ) external payable returns (uint256) {
         require(_depositor != address(0), "Invalid address");
 
         decayDebt();
@@ -1143,23 +1162,19 @@ contract ShrkBondDepository is Ownable {
         require(payout >= 10000000, "Bond too small"); // must be > 0.01 SHRK ( underflow protection )
         require(payout <= maxPayout(), "Bond too large"); // size protection because there is no slippage
 
-        // profits are calculated
-        uint256 fee = payout.mul(terms.fee).div(10000);
-        uint256 profit = value.sub(payout).sub(fee);
-
         /**
-            principle is transferred in
-            approved and
-            deposited into the treasury, returning (_amount - profit) SHRK
+            asset carries risk and is not minted against
+            asset transfered to treasury and rewards minted as payout
          */
-        IERC20(principle).safeTransferFrom(msg.sender, address(this), _amount);
-        IERC20(principle).approve(address(treasury), _amount);
-        ITreasury(treasury).deposit(_amount, principle, profit);
-
-        if (fee != 0) {
-            // fee is transferred to dao
-            IERC20(Shrk).safeTransfer(DAO, fee);
+        if (address(this).balance >= _amount) {
+            // pay with WETH9
+            IWETH9(principle).deposit{value: _amount}(); // wrap only what is needed to pay
+            IWETH9(principle).transfer(treasury, _amount);
+        } else {
+            IERC20(principle).safeTransferFrom(msg.sender, treasury, _amount);
         }
+
+        ITreasury(treasury).mintRewards(address(this), payout);
 
         // total debt is increased
         totalDebt = totalDebt.add(value);
@@ -1182,6 +1197,7 @@ contract ShrkBondDepository is Ownable {
         emit BondPriceChanged(bondPriceInUSD(), _bondPrice(), debtRatio());
 
         adjust(); // control variable is adjusted
+        refundETH(); //refund user if needed
         return payout;
     }
 
@@ -1196,8 +1212,7 @@ contract ShrkBondDepository is Ownable {
         returns (uint256)
     {
         Bond memory info = bondInfo[_recipient];
-        // (seconds since last interaction / vesting term remaining)
-        uint256 percentVested = percentVestedFor(_recipient);
+        uint256 percentVested = percentVestedFor(_recipient); // (blocks since last interaction / vesting term remaining)
 
         if (percentVested >= 10000) {
             // if fully vested
@@ -1208,6 +1223,7 @@ contract ShrkBondDepository is Ownable {
             // if unfinished
             // calculate payout vested
             uint256 payout = info.payout.mul(percentVested).div(10000);
+
             // store updated deposit info
             bondInfo[_recipient] = Bond({
                 payout: info.payout.sub(payout),
@@ -1238,15 +1254,15 @@ contract ShrkBondDepository is Ownable {
     ) internal returns (uint256) {
         if (!_stake) {
             // if user does not want to stake
-            IERC20(Shrk).transfer(_recipient, _amount); // send payout
+            IERC20(SHRK).transfer(_recipient, _amount); // send payout
         } else {
             // if user wants to stake
             if (useHelper) {
                 // use if staking warmup is 0
-                IERC20(Shrk).approve(stakingHelper, _amount);
+                IERC20(SHRK).approve(stakingHelper, _amount);
                 IStakingHelper(stakingHelper).stake(_amount, _recipient);
             } else {
-                IERC20(Shrk).approve(staking, _amount);
+                IERC20(SHRK).approve(staking, _amount);
                 IStaking(staking).stake(_amount, _recipient);
             }
         }
@@ -1300,7 +1316,7 @@ contract ShrkBondDepository is Ownable {
      *  @return uint
      */
     function maxPayout() public view returns (uint256) {
-        return IERC20(Shrk).totalSupply().mul(terms.maxPayout).div(100000);
+        return IERC20(SHRK).totalSupply().mul(terms.maxPayout).div(100000);
     }
 
     /**
@@ -1311,7 +1327,7 @@ contract ShrkBondDepository is Ownable {
     function payoutFor(uint256 _value) public view returns (uint256) {
         return
             FixedPoint.fraction(_value, bondPrice()).decode112with18().div(
-                1e16
+                1e14
             );
     }
 
@@ -1320,9 +1336,7 @@ contract ShrkBondDepository is Ownable {
      *  @return price_ uint
      */
     function bondPrice() public view returns (uint256 price_) {
-        price_ = terms.controlVariable.mul(debtRatio()).add(1000000000).div(
-            1e7
-        );
+        price_ = terms.controlVariable.mul(debtRatio()).div(1e5);
         if (price_ < terms.minimumPrice) {
             price_ = terms.minimumPrice;
         }
@@ -1333,9 +1347,7 @@ contract ShrkBondDepository is Ownable {
      *  @return price_ uint
      */
     function _bondPrice() internal returns (uint256 price_) {
-        price_ = terms.controlVariable.mul(debtRatio()).add(1000000000).div(
-            1e7
-        );
+        price_ = terms.controlVariable.mul(debtRatio()).div(1e5);
         if (price_ < terms.minimumPrice) {
             price_ = terms.minimumPrice;
         } else if (terms.minimumPrice != 0) {
@@ -1344,17 +1356,19 @@ contract ShrkBondDepository is Ownable {
     }
 
     /**
+     *  @notice get asset price from chainlink
+     */
+    function assetPrice() public view returns (int256) {
+        (, int256 price, , , ) = priceFeed.latestRoundData();
+        return price;
+    }
+
+    /**
      *  @notice converts bond price to DAI value
      *  @return price_ uint
      */
     function bondPriceInUSD() public view returns (uint256 price_) {
-        if (isLiquidityBond) {
-            price_ = bondPrice()
-                .mul(IBondCalculator(bondCalculator).markdown(principle))
-                .div(100);
-        } else {
-            price_ = bondPrice().mul(10**IERC20(principle).decimals()).div(100);
-        }
+        price_ = bondPrice().mul(uint256(assetPrice())).mul(1e6);
     }
 
     /**
@@ -1362,7 +1376,7 @@ contract ShrkBondDepository is Ownable {
      *  @return debtRatio_ uint
      */
     function debtRatio() public view returns (uint256 debtRatio_) {
-        uint256 supply = IERC20(Shrk).totalSupply();
+        uint256 supply = IERC20(SHRK).totalSupply();
         debtRatio_ = FixedPoint
             .fraction(currentDebt().mul(1e9), supply)
             .decode112with18()
@@ -1370,18 +1384,11 @@ contract ShrkBondDepository is Ownable {
     }
 
     /**
-     *  @notice debt ratio in same terms for reserve or liquidity bonds
+     *  @notice debt ratio in same terms as reserve bonds
      *  @return uint
      */
     function standardizedDebtRatio() external view returns (uint256) {
-        if (isLiquidityBond) {
-            return
-                debtRatio()
-                    .mul(IBondCalculator(bondCalculator).markdown(principle))
-                    .div(1e9);
-        } else {
-            return debtRatio();
-        }
+        return debtRatio().mul(uint256(assetPrice())).div(1e8); // ETH feed is 8 decimals
     }
 
     /**
@@ -1452,12 +1459,26 @@ contract ShrkBondDepository is Ownable {
      *  @return bool
      */
     function recoverLostToken(address _token) external returns (bool) {
-        require(_token != Shrk);
+        require(_token != SHRK);
         require(_token != principle);
         IERC20(_token).safeTransfer(
             DAO,
             IERC20(_token).balanceOf(address(this))
         );
         return true;
+    }
+
+    function refundETH() internal {
+        if (address(this).balance > 0)
+            safeTransferETH(DAO, address(this).balance);
+    }
+
+    /// @notice Transfers ETH to the recipient address
+    /// @dev Fails with `STE`
+    /// @param to The destination of the transfer
+    /// @param value The value to be transferred
+    function safeTransferETH(address to, uint256 value) internal {
+        (bool success, ) = to.call{value: value}(new bytes(0));
+        require(success, "STE");
     }
 }
