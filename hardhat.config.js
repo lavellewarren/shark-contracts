@@ -1,7 +1,9 @@
 require("@nomiclabs/hardhat-waffle");
 require("@nomiclabs/hardhat-truffle5");
+require("@nomiclabs/hardhat-etherscan");
 
 const { privateKey_1 } = require('./data/privatekey')
+const etherscanApiKey = 'XF74TBYV4CQS3XKFAK94JSQJ8H1B6SVCR8';
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
@@ -47,6 +49,14 @@ module.exports = {
       accounts: [`0x${privateKey_1}`],
       live: true,
     },
+    rinkeby: {
+      url: 'https://rinkeby.infura.io/v3/',
+      accounts: [`0x${privateKey_1}`],
+      live: true,
+    },
+  },
+  etherscan: {
+    apiKey: etherscanApiKey
   },
   mocha: {
     timeout: 300000
