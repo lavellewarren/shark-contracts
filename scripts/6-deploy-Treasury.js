@@ -11,7 +11,7 @@ async function main() {
     const SHRK = new ethers.Contract(ShrkERC20.address, ShrkERC20.abi, deployer);
     console.log(`SHRK address: ${SHRK.address}`);
 
-    const mimAddress = '';
+    const mimAddress = '0xB2180448f8945C8Cc8AE9809E67D6bd27d8B2f2C';
     const _secondsNeededForQueue = 60;
 
     const contractFactory = await ethers.getContractFactory('SharkTreasury');

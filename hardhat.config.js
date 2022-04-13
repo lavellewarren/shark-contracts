@@ -50,7 +50,7 @@ module.exports = {
       live: true,
     },
     rinkeby: {
-      url: 'https://rinkeby.infura.io/v3/',
+      url: 'https://eth-rinkeby.alchemyapi.io/v2/RuGxhTpkUt3S6InAt33l_3NZc4pFwXxS',
       accounts: [`0x${privateKey_1}`],
       live: true,
     },
