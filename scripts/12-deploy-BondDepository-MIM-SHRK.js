@@ -23,7 +23,9 @@ async function main() {
     const bondCalculator = new ethers.Contract(SharkBondingCalculator.address, SharkBondingCalculator.abi, deployer);
     console.log(`SharkBondingCalculator address: ${bondCalculator.address}`);
 
-    const _principle = '';
+    const _principle = '0x13C0D45756Ae530BaEaf18ae10A4F2B73557a19d';    // LP of DAI/SHRK
+
+    const bondCalculatorAddress = bondCalculator.address;
 
     const contractFactory = await ethers.getContractFactory('SharkBondDepository');
     const contract = await contractFactory.deploy(
@@ -31,7 +33,7 @@ async function main() {
         _principle,
         treasury.address,
         DAO.address,
-        bondCalculator.address,
+        bondCalculatorAddress,
     );
     console.log(`Contract address: ${contract.address}`);
 
@@ -39,10 +41,10 @@ async function main() {
         address: contract.address,
         abi: JSON.parse(contract.interface.format('json'))
     };
-    fs.writeFileSync('abi/SharkBondDepository.json', JSON.stringify(data));
+    fs.writeFileSync('abi/SharkBondDepository-MIM-SHRK.json', JSON.stringify(data));
 
     console.log("Verify contract:");
-    console.log(`npx hardhat verify --network rinkeby ${contract.address} ${SHRK.address} ${_principle} ${treasury.address} ${DAO.address} ${bondCalculator.address}`);
+    console.log(`npx hardhat verify --network rinkeby ${contract.address} ${SHRK.address} ${_principle} ${treasury.address} ${DAO.address} ${bondCalculatorAddress}`);
 }
 
 main()

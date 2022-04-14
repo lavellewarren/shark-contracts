@@ -7,8 +7,12 @@ async function main() {
     const balance = await deployer.getBalance();
     console.log(`Account balance: ${balance.toString()}`);
 
+    const owners = [deployer.address];
+    const _required = 1;
+    const _dailyLimit = 0;
+
     const contractFactory = await ethers.getContractFactory('MultiSigWalletWithDailyLimit');
-    const contract = await contractFactory.deploy();
+    const contract = await contractFactory.deploy(owners, _required, _dailyLimit);
     console.log(`Contract address: ${contract.address}`);
 
     const data = {
@@ -16,9 +20,6 @@ async function main() {
         abi: JSON.parse(contract.interface.format('json'))
     };
     fs.writeFileSync('abi/MultiSigWalletWithDailyLimit.json', JSON.stringify(data));
-
-    console.log("Verify contract:");
-    console.log(`npx hardhat verify --network rinkeby ${contract.address}`);
 }
 
 main()

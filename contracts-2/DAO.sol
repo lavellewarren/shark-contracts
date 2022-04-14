@@ -1,7 +1,3 @@
-/**
- *Submitted for verification at snowtrace.io on 2021-11-02
-*/
-
 // File: contracts/MultiSigWallet.sol
 
 pragma solidity ^0.4.15;
