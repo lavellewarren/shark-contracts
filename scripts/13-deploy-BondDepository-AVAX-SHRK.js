@@ -1,6 +1,5 @@
 const fs = require('fs');
 const ShrkERC20 = require('../abi/SharkERC20Token.json');
-const MultiSigWalletWithDailyLimit = require('../abi/MultiSigWalletWithDailyLimit.json');
 const SharkTreasury = require('../abi/SharkTreasury.json');
 const SharkBondingCalculator = require('../abi/SharkBondingCalculator.json');
 
@@ -14,8 +13,7 @@ async function main() {
     const SHRK = new ethers.Contract(ShrkERC20.address, ShrkERC20.abi, deployer);
     console.log(`SHRK address: ${SHRK.address}`);
 
-    const DAO = new ethers.Contract(MultiSigWalletWithDailyLimit.address, MultiSigWalletWithDailyLimit.abi, deployer);
-    console.log(`DAO address: ${DAO.address}`);
+    const daoAddress = '0xFDdFA9B8b7B13983CC6b360Fa0d5864306e5faaD';
 
     const treasury = new ethers.Contract(SharkTreasury.address, SharkTreasury.abi, deployer);
     console.log(`SharkTreasury address: ${treasury.address}`);
@@ -32,7 +30,7 @@ async function main() {
         SHRK.address,
         _principle,
         treasury.address,
-        DAO.address,
+        daoAddress,
         bondCalculatorAddress,
     );
     console.log(`Contract address: ${contract.address}`);
